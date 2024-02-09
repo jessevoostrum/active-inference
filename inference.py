@@ -56,17 +56,14 @@ def combine_observation_modalities(A_flat_states):
 
     num_states = len(A_flat_states[0][0, :])
     num_modalities = len(A_flat_states)
-    num_observations_per_modality = [len(A_flat_states_m[:, 0]) for A_flat_states_m in A_flat_states]
-    num_observations = product_of_elements(num_observations_per_modality)
 
+    multi_idx_list_observations = get_multi_idx_list_observations(A_flat_states=A_flat_states)
+    num_observations = len(multi_idx_list_observations)
     A_flat = np.zeros((num_observations, num_states))
-
-    multi_index_list_observations = list(itertools.product(*[range(s) for s in num_observations_per_modality]))
-    print(multi_index_list_observations)
 
     for idx_s in range(num_states):
 
-        for single_idx_obs, multi_idx_obs in enumerate(multi_index_list_observations):
+        for single_idx_obs, multi_idx_obs in enumerate(multi_idx_list_observations):
             # compute list of p(o^m | s) for different modalities m and fixed state s = ss[idx_s]
             list_probs = [A_flat_states[m][multi_idx_obs[m], idx_s] for m in range(num_modalities)]
 
@@ -74,29 +71,26 @@ def combine_observation_modalities(A_flat_states):
 
             A_flat[single_idx_obs, idx_s] = joint_prob
 
-    return A_flat, multi_index_list_observations
-
+    return A_flat
 
 def make_B_flat(B):
     """
     go from [p(s^1_tau|s^1_{tau-1}, u_{tau-1}), ..., p(s^f_tau|s^f_{tau-1}, u_{tau-1})] to
     p(s_tau|s_{tau-1}, u_{tau-1}) """
     num_factors = len(B)
-    num_states_per_factor = [B[f].shape[0] for f in range(num_factors)]
-    num_states = product_of_elements(num_states_per_factor)
     num_actions = max([B[f].shape[-1] for f in range(num_factors)])
 
     B = preprocess_B(B, num_actions)
 
-    B_flat = np.zeros((num_states, num_states, num_actions))
+    multi_idx_list_states = get_multi_idx_list_states(B)
+    num_states = len(multi_idx_list_states)
 
-    multi_index_list_states = list(itertools.product(*[range(s) for s in num_states_per_factor]))
-    print(multi_index_list_states)
+    B_flat = np.zeros((num_states, num_states, num_actions))
 
     for idx_action in range(num_actions):
 
-        for single_idx_state_tau, multi_idx_state_tau in enumerate(multi_index_list_states):
-            for single_idx_state_tau_prev, multi_idx_state_tau_prev in enumerate(multi_index_list_states):
+        for single_idx_state_tau, multi_idx_state_tau in enumerate(multi_idx_list_states):
+            for single_idx_state_tau_prev, multi_idx_state_tau_prev in enumerate(multi_idx_list_states):
 
                 list_probs = [B[f][multi_idx_state_tau[f], multi_idx_state_tau_prev[f], idx_action] for f in
                               range(num_factors)]
@@ -104,11 +98,11 @@ def make_B_flat(B):
 
                 B_flat[single_idx_state_tau, single_idx_state_tau_prev, idx_action] = joint_prob
 
-    return B_flat, multi_index_list_states
+    return B_flat
 
 
 def preprocess_B(B, num_actions):
-    """ to account for uncontrollable transition dynamics that have a smaller number of action """
+    """ give uncontrollable transition dynamics same number of actions """
     B_new = []
     for B_i in B:
         if B_i.shape[-1] < num_actions:
@@ -116,27 +110,53 @@ def preprocess_B(B, num_actions):
         B_new.append(B_i)
     return B_new
 
+def make_C_flat(C):
+    multi_idx_list_observations = get_multi_idx_list_observations(C=C)
+    num_observations = len(multi_idx_list_observations)
 
-def product_of_elements(lst):
-    result = 1
-    for num in lst:
-        result *= num
-    return result
+    C_flat = np.zeros(num_observations)
+
+    for single_idx_observation, multi_idx_observation in enumerate(multi_idx_list_observations):
+        for modality, observation in enumerate(multi_idx_observation):
+            C_flat[single_idx_observation] += C[modality][observation]
+
+    return C_flat
 
 def make_D_flat(D):
 
     num_factors = len(D)
-    num_states_per_factor = [D[f].shape[0] for f in range(num_factors)]
-    num_states = product_of_elements(num_states_per_factor)
+    num_states_per_factor = [D_i.shape[0] for D_i in D]
 
-    D_flat = np.zeros((num_states,))
+    multi_idx_list_states = get_multi_idx_list_states(num_states_per_factor)
+    num_states = len(multi_idx_list_states)
 
-    multi_index_list_states = list(itertools.product(*[range(s) for s in num_states_per_factor]))
+    D_flat = np.zeros(num_states)
 
-    for single_idx_state, multi_idx_state in enumerate(multi_index_list_states):
+    for single_idx_state, multi_idx_state in enumerate(multi_idx_list_states):
         list_probs = [D[f][multi_idx_state[f]] for f in range(num_factors)]
         joint_prob = product_of_elements(list_probs)
         D_flat[single_idx_state] = joint_prob
 
     return D_flat
 
+
+def get_multi_idx_list_states(B):
+    num_factors = len(B)
+    num_states_per_factor = [B[f].shape[0] for f in range(num_factors)]
+    multi_idx_list_states = list(itertools.product(*[range(s) for s in num_states_per_factor]))
+    return multi_idx_list_states
+
+def get_multi_idx_list_observations(A_flat_states=None, C=None):
+    if A_flat_states:
+        num_observations_per_modality = [len(A_flat_states_m[:, 0]) for A_flat_states_m in A_flat_states]
+    if C:
+        num_observations_per_modality = [C_i.shape[0] for C_i in C]
+
+    multi_idx_list_observations = list(itertools.product(*[range(s) for s in num_observations_per_modality]))
+    return multi_idx_list_observations
+
+def product_of_elements(lst):
+    result = 1
+    for num in lst:
+        result *= num
+    return result

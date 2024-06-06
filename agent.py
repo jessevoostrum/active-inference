@@ -12,6 +12,7 @@ class Agent:
 
         self.A = make_A_flat(A_unflat, self.multi_idx_list_observations)
         self.B = make_B_flat(B_unflat, self.multi_idx_list_states)
+
         self.C = softmax(make_C_flat(C_unflat, self.multi_idx_list_observations))
 
         num_states = self.B.shape[0]
@@ -27,7 +28,7 @@ class Agent:
 
         self.epsilon = 0.0000001  # avoid division by zero, logs of zero
 
-
+        self.num_factors = len(A_unflat[0].shape) - 1
     def sample_action(self):
         efes = np.zeros(len(self.policy_space))
         for idx, policy in enumerate(self.policy_space):
@@ -41,17 +42,24 @@ class Agent:
 
         q_pi = softmax(efes)
 
+        for q_pi_i, policy in zip(q_pi, self.policy_space):
+            print(q_pi_i, policy)
+
         sampled_policy = self.policy_space[np.random.choice(len(self.policy_space), p=q_pi)]
         sampled_policy = self.policy_space[efes.argmax()]
 
-        return sampled_policy[0]
+        action = sampled_policy[0]
+        action_unflat = make_action_unflat(action, self.num_factors)
 
-    def update_belief_current_state(self, observation_unflat, action=None):
+        return action_unflat
+
+    def update_belief_current_state(self, observation_unflat, action_unflat=None):
         observation = self.convert_unflat_oberservation(observation_unflat, self.multi_idx_list_observations)
 
-        if not action:
+        if action_unflat is None:
             prior = self.belief_current_state
-        if action:
+        else:
+            action = make_action_flat(action_unflat)
             prior = np.matmul(self.B[:, :, action], self.belief_current_state)
 
         posterior = prior * self.A[observation, :]
@@ -226,6 +234,15 @@ def make_D_flat(D, multi_idx_list_states):
         D_flat[single_idx_state] = joint_prob
 
     return D_flat
+
+def make_action_unflat(action, num_factors, factor_idx=0):
+    action_unflat = np.zeros(num_factors,dtype=int)
+    action_unflat[factor_idx] = action
+    return action_unflat
+
+def make_action_flat(action_unflat, factor_idx=0):
+    return action_unflat[factor_idx]
+
 
 def get_multi_idx_list_states(B):
     num_states_per_factor = [B_i.shape[0] for B_i in B]

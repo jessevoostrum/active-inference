@@ -17,7 +17,7 @@ C[1][2] = 1
 
 T = 3  # number of time steps
 
-agent = Agent(A_unflat=A_gp, B_unflat=B_gp, C_unflat=C, plan_num_steps_ahead= 1) #T - 1)
+agent = Agent(A_unflat=A_gp, B_unflat=B_gp, C_unflat=C, plan_num_steps_ahead=T-1)
 
 obs = env.reset()  # reset the environment and get an initial observation
 

@@ -10,14 +10,16 @@ env = TMazeEnv(reward_probs=reward_probabilities)
 A_gp = env.get_likelihood_dist()
 B_gp = env.get_transition_dist()
 
-C = [np.zeros(A_gp_i.shape[0]) for A_gp_i in A_gp]
+num_obs_per_modality = [A_gp_i.shape[0] for A_gp_i in A_gp]
+
+C = [np.zeros(num_obs_modality_i) for num_obs_modality_i in num_obs_per_modality]
 C[1][0] = 2
 C[1][1] = 3
 C[1][2] = 1
 
 T = 3  # number of time steps
 
-agent = Agent(A_unflat=A_gp, B_unflat=B_gp, C_unflat=C, plan_num_steps_ahead=T-1)
+agent = Agent(A=A_gp, B=B_gp, C=C, plan_num_steps_ahead=T-1)
 
 obs = env.reset()  # reset the environment and get an initial observation
 

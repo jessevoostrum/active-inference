@@ -21,31 +21,40 @@ T = 3  # number of time steps
 
 agent = Agent(A=A_gp, B=B_gp, C=C, plan_num_steps_ahead=T-1)
 
-obs = env.reset()  # reset the environment and get an initial observation
 
 # these are useful for displaying read-outs during the loop over time
 reward_conditions = ["Right", "Left"]
 location_observations = ['CENTER','RIGHT ARM','LEFT ARM','CUE LOCATION']
 reward_observations = ['No reward','Reward!','Loss!']
 cue_observations = ['Cue Right','Cue Left']
-msg = """ === Starting experiment === \n Reward condition: {}, Observation: [{}, {}, {}]"""
-print(msg.format(reward_conditions[env.reward_condition], location_observations[obs[0]], reward_observations[obs[1]], cue_observations[obs[2]]))
+msg1 = """ === Starting experiment === \n Reward condition: {}, Observation: [{}, {}, {}]"""
+msg2 = """[Step {}] Action: [Move to {}]"""
+msg3 = """[Step {}] Observation: [{},  {}, {}]"""
 
-action = None
+for _ in range(100):
+    obs = env.reset()  # reset the environment and get an initial observation
+    print(
+        msg1.format(reward_conditions[env.reward_condition], location_observations[obs[0]], reward_observations[obs[1]],
+                    cue_observations[obs[2]]))
 
-for t in range(T):
+    action = None
 
-    agent.update_belief_current_state(obs, action)
+    for t in range(T):
 
-    action = agent.sample_action()
+        agent.update_belief_current_state(obs, action)
 
-    msg = """[Step {}] Action: [Move to {}]"""
-    print(msg.format(t, location_observations[int(action[0])]))
+        agent.update_A(obs)
 
-    obs = env.step(action)
+        if t > 0:
+            agent.update_B()
 
-    msg = """[Step {}] Observation: [{},  {}, {}]"""
-    print(msg.format(t, location_observations[obs[0]], reward_observations[obs[1]], cue_observations[obs[2]]))
+        action = agent.sample_action()
+
+        print(msg2.format(t, location_observations[int(action[0])]))
+
+        obs = env.step(action)
+
+        print(msg3.format(t, location_observations[obs[0]], reward_observations[obs[1]], cue_observations[obs[2]]))
 
 
 

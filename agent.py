@@ -13,6 +13,9 @@ class Agent:
         self.A = self.flattener.A_flat
         self.B = self.flattener.B_flat
 
+        self.pA = np.ones(self.A.shape)
+        self.pB = np.ones(self.B.shape)
+
         self.C = softmax(self.flattener.C_flat)
 
         if D:
@@ -20,14 +23,29 @@ class Agent:
         else:
             self.belief_current_state = self.uniform_distribution(num_states=self.B.shape[0])
 
+        self.belief_last_state = self.belief_current_state
+
+        self.last_action = None
+
         self.policy_space = self.make_policy_space(num_actions=self.B.shape[2], plan_num_steps_ahead=plan_num_steps_ahead)
 
         self.sample_maximum = True
 
         self.epsilon = 0.0000001  # avoid division by zero, logs of zero
 
+    def update_A(self, observation):
+        self.update_pA(observation)
+        self.A = self.pA / self.pA.sum(axis=0)
 
+    def update_pA(self, observation):
+        observation = self.flattener.flatten_observation(observation)
+        self.pA[observation, :] += self.belief_current_state
 
+    def update_B(self):
+        self.update_pB()
+        self.B = self.pB / self.pB.sum(axis=0)
+    def update_pB(self):
+        self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)
 
     def sample_action(self):
         efes = np.zeros(len(self.policy_space))
@@ -45,11 +63,16 @@ class Agent:
             sampled_policy = self.policy_space[np.random.choice(len(self.policy_space), p=q_pi)]
 
         action = sampled_policy[0]
+
+        self.last_action = action
+
         action_unflat = self.flattener.unflatten_action(action)
 
         return action_unflat
 
     def update_belief_current_state(self, observation_unflat, action_unflat=None):
+        self.belief_last_state = self.belief_current_state
+
         observation = self.flattener.flatten_observation(observation_unflat)
 
         if action_unflat is None:
@@ -130,6 +153,8 @@ class Agent:
     @staticmethod
     def uniform_distribution(num_states):
         return np.ones(num_states) / num_states
+
+
 
 
 

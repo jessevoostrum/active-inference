@@ -1,0 +1,3 @@
+inferactively-pymdp
+scipy
+numpy

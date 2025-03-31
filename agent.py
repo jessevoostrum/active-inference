@@ -12,17 +12,13 @@ class Agent:
 
         self.A = self.flattener.A_flat
         self.B = self.flattener.B_flat
+        self.C = softmax(self.flattener.C_flat)
+        self.D = self.flattener.D_flat
 
         self.pA = np.ones(self.A.shape)
         self.pB = np.ones(self.B.shape)
 
-        self.C = softmax(self.flattener.C_flat)
-
-        if D:
-            self.belief_current_state = self.flattener.D_flat
-        else:
-            self.belief_current_state = self.uniform_distribution(num_states=self.B.shape[0])
-
+        self.belief_current_state = self.get_belief_initial_state()
         self.belief_last_state = self.belief_current_state
 
         self.last_action = None
@@ -33,19 +29,6 @@ class Agent:
 
         self.epsilon = 0.0000001  # avoid division by zero, logs of zero
 
-    def update_A(self, observation):
-        self.update_pA(observation)
-        self.A = self.pA / self.pA.sum(axis=0)
-
-    def update_pA(self, observation):
-        observation = self.flattener.flatten_observation(observation)
-        self.pA[observation, :] += self.belief_current_state
-
-    def update_B(self):
-        self.update_pB()
-        self.B = self.pB / self.pB.sum(axis=0)
-    def update_pB(self):
-        self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)
 
     def sample_action(self):
         efes = np.zeros(len(self.policy_space))
@@ -69,6 +52,16 @@ class Agent:
         action_unflat = self.flattener.unflatten_action(action)
 
         return action_unflat
+
+    def get_belief_initial_state(self):
+        if self.D:
+            return  self.flattener.D_flat
+        else:
+            return self.uniform_distribution(num_states=self.B.shape[0])
+
+    def reset_belief_state(self):
+        self.belief_current_state = self.get_belief_initial_state()
+        self.belief_last_state = self.belief_current_state
 
     def update_belief_current_state(self, observation_unflat, action_unflat=None):
         self.belief_last_state = self.belief_current_state
@@ -145,6 +138,23 @@ class Agent:
             info_gain += expectation
 
         return info_gain
+
+
+    # Learning
+    def update_A(self, observation):
+        self.update_pA(observation)
+        self.A = self.pA / self.pA.sum(axis=0)
+
+    def update_pA(self, observation):
+        observation = self.flattener.flatten_observation(observation)
+        self.pA[observation, :] += self.belief_current_state
+
+    def update_B(self):
+        self.update_pB()
+        self.B = self.pB / self.pB.sum(axis=0)
+    def update_pB(self):
+        self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)
+
 
     @staticmethod
     def make_policy_space(num_actions, plan_num_steps_ahead):

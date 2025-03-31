@@ -21,6 +21,7 @@ T = 3  # number of time steps
 
 agent = Agent(A=A_gp, B=B_gp, C=C, plan_num_steps_ahead=T-1)
 
+
 # these are useful for displaying read-outs during the loop over time
 reward_conditions = ["Right", "Left"]
 location_observations = ['CENTER','RIGHT ARM','LEFT ARM','CUE LOCATION']
@@ -30,24 +31,31 @@ msg1 = """ === Starting experiment === \n Reward condition: {}, Observation: [{}
 msg2 = """[Step {}] Action: [Move to {}]"""
 msg3 = """[Step {}] Observation: [{},  {}, {}]"""
 
-obs = env.reset()  # reset the environment and get an initial observation
-print(
-    msg1.format(reward_conditions[env.reward_condition], location_observations[obs[0]], reward_observations[obs[1]],
-                cue_observations[obs[2]]))
+for _ in range(100):
+    agent.reset_belief_state()
+    obs = env.reset()  # reset the environment and get an initial observation
+    print(
+        msg1.format(reward_conditions[env.reward_condition], location_observations[obs[0]], reward_observations[obs[1]],
+                    cue_observations[obs[2]]))
 
-action = None
+    action = None
 
-for t in range(T):
+    for t in range(T):
 
-    agent.update_belief_current_state(obs, action)
+        agent.update_belief_current_state(obs, action)
 
-    action = agent.sample_action()
+        agent.update_A(obs)
 
-    print(msg2.format(t, location_observations[int(action[0])]))
+        if t > 0:
+            agent.update_B()
 
-    obs = env.step(action)
+        action = agent.sample_action()
 
-    print(msg3.format(t, location_observations[obs[0]], reward_observations[obs[1]], cue_observations[obs[2]]))
+        print(msg2.format(t, location_observations[int(action[0])]))
+
+        obs = env.step(action)
+
+        print(msg3.format(t, location_observations[obs[0]], reward_observations[obs[1]], cue_observations[obs[2]]))
 
 
 

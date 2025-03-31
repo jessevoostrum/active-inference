@@ -1,3 +1,9 @@
+""" Agent class
+The numbers in the comments of the methods refer to equation numbers in the paper:
+"A Concise Mathematical Description of Active Inference in Discrete Time",
+by Jesse van Oostrum, Carlotta Langer and Nihat Ay
+"""
+
 import numpy as np
 from scipy.special import softmax
 import itertools
@@ -150,6 +156,7 @@ class Agent:
         """(21)"""
         self.update_pB()
         self.B = self.pB / self.pB.sum(axis=0)
+
     def update_pB(self):
         """(20)"""
         self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)

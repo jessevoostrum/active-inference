@@ -1,3 +1,6 @@
+"""Example usage of the update rules for the A and B matrix.
+Note that this environment is not rich enough for these matrices to be fully learned."""
+
 import numpy as np
 from pymdp.envs import TMazeEnv
 

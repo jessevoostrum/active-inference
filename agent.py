@@ -25,12 +25,12 @@ class Agent:
 
         self.policy_space = self.make_policy_space(num_actions=self.B.shape[2], plan_num_steps_ahead=plan_num_steps_ahead)
 
-        self.sample_maximum = True
 
         self.epsilon = 0.0000001  # avoid division by zero, logs of zero
 
 
     def sample_action(self):
+        """(1)"""
         efes = np.zeros(len(self.policy_space))
         for idx, policy in enumerate(self.policy_space):
             belief_next_states = self.get_belief_next_states(policy)
@@ -39,31 +39,44 @@ class Agent:
                                                           self.get_belief_next_states_given_observation(belief_next_states))
 
         q_pi = softmax(efes)
-
-        if self.sample_maximum:
-            sampled_policy = self.policy_space[efes.argmax()]
-        else:
-            sampled_policy = self.policy_space[np.random.choice(len(self.policy_space), p=q_pi)]
-
+        sampled_policy = self.policy_space[np.random.choice(len(self.policy_space), p=q_pi)]
         action = sampled_policy[0]
-
         self.last_action = action
-
         action_unflat = self.flattener.unflatten_action(action)
-
         return action_unflat
 
-    def get_belief_initial_state(self):
-        if self.D:
-            return  self.flattener.D_flat
-        else:
-            return self.uniform_distribution(num_states=self.B.shape[0])
+    def compute_expected_free_energy(self, belief_next_states, belief_next_observations, belief_next_states_given_observation):
+        """(4) and (5)"""
+        utility = self.compute_utility(belief_next_observations)
 
-    def reset_belief_state(self):
-        self.belief_current_state = self.get_belief_initial_state()
-        self.belief_last_state = self.belief_current_state
+        info_gain = self.compute_info_gain(belief_next_states, belief_next_observations, belief_next_states_given_observation)
+
+        efe = utility + info_gain
+        return efe
+
+    def compute_info_gain(self, belief_next_states, belief_next_observations, belief_next_states_given_observation):
+        """Sum over tau of the first term on the RHS of (5)"""
+        info_gain = 0
+        for belief_next_state, belief_next_observations, belief_next_state_given_observation in zip(belief_next_states, belief_next_observations, belief_next_states_given_observation):
+
+            KL_div = belief_next_state_given_observation * np.log((belief_next_state_given_observation + self.epsilon)/ (np.array([belief_next_state]).T + self.epsilon))
+            KL_div = KL_div.sum(axis=0)
+
+            expectation = np.dot(belief_next_observations, KL_div)
+
+            info_gain += expectation
+
+        return info_gain
+
+    def compute_utility(self, belief_next_observations):
+        """Sum over tau of the second term on the RHS of (5)"""
+        utility = 0
+        for belief_next_observation in belief_next_observations:
+            utility += np.dot(belief_next_observation, np.log(self.C + self.epsilon))
+        return utility
 
     def update_belief_current_state(self, observation_unflat, action_unflat=None):
+        """(6)"""
         self.belief_last_state = self.belief_current_state
 
         observation = self.flattener.flatten_observation(observation_unflat)
@@ -81,7 +94,7 @@ class Agent:
         self.belief_current_state = posterior
 
     def get_belief_next_states(self, policy):
-
+        """(7)"""
         belief_next_states = []
         belief_prev_state = self.belief_current_state
 
@@ -94,11 +107,9 @@ class Agent:
 
         return belief_next_states
 
-    def get_belief_next_observations(self, belief_next_states):
-        return [np.matmul(self.A, belief_next_state) for belief_next_state in belief_next_states]
-
     def get_belief_next_states_given_observation(self, belief_next_states):
-        """list of matrices p(s_\tau|o_\tau). dims: [time][state][observation] """
+        """ (8)
+        list of matrices p(s_\tau|o_\tau). dims: [time][state][observation] """
 
         belief_next_states_given_observation = []
 
@@ -109,50 +120,38 @@ class Agent:
 
         return belief_next_states_given_observation
 
-    def compute_expected_free_energy(self, belief_next_states, belief_next_observations, belief_next_states_given_observation):
+    def get_belief_next_observations(self, belief_next_states):
+        """(9)"""
+        return [np.matmul(self.A, belief_next_state) for belief_next_state in belief_next_states]
 
-        utility = self.compute_utility(belief_next_observations)
 
-        info_gain = self.compute_info_gain(belief_next_states, belief_next_observations, belief_next_states_given_observation)
+    def get_belief_initial_state(self):
+        if self.D:
+            return  self.flattener.D_flat
+        else:
+            return self.uniform_distribution(num_states=self.B.shape[0])
 
-        efe = utility + info_gain
-        return efe
-
-    def compute_utility(self, belief_next_observations):
-        utility = 0
-        for belief_next_observation in belief_next_observations:
-            utility += np.dot(belief_next_observation, np.log(self.C + self.epsilon))
-        return utility
-
-    def compute_info_gain(self, belief_next_states, belief_next_observations, belief_next_states_given_observation):
-
-        info_gain = 0
-
-        for belief_next_state, belief_next_observations, belief_next_state_given_observation in zip(belief_next_states, belief_next_observations, belief_next_states_given_observation):
-
-            KL_div = belief_next_state_given_observation * np.log((belief_next_state_given_observation + self.epsilon)/ (np.array([belief_next_state]).T + self.epsilon))
-            KL_div = KL_div.sum(axis=0)
-
-            expectation = np.dot(belief_next_observations, KL_div)
-
-            info_gain += expectation
-
-        return info_gain
-
+    def reset_belief_state(self):
+        self.belief_current_state = self.get_belief_initial_state()
+        self.belief_last_state = self.belief_current_state
 
     # Learning
     def update_A(self, observation):
+        """(21)"""
         self.update_pA(observation)
         self.A = self.pA / self.pA.sum(axis=0)
 
     def update_pA(self, observation):
+        """(19)"""
         observation = self.flattener.flatten_observation(observation)
         self.pA[observation, :] += self.belief_current_state
 
     def update_B(self):
+        """(21)"""
         self.update_pB()
         self.B = self.pB / self.pB.sum(axis=0)
     def update_pB(self):
+        """(20)"""
         self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)
 
 

@@ -7,7 +7,7 @@ An example usage can be found in the file `tmaze.py`.
 
 The most important thing to note is that in this implementation all observation modalities and state factors are flattened into one single dimension. This significantly simplifies the implementation of the main equations of active inference, compared to other implementations such as `SPM` and `pymdp`. We use the class Flattener to translate between the original (unflattened) observations and states and their flattened versions. 
 
-In `tmaze-learning.py` you can find an example of how the agent would update the A and B matrices. However, this environment is not rich enough for these matrices to be fully learned. 
+In `tmaze-learning.py` you can find an example of how the agent would update the A and B matrices. Note however that the agent is usually not able to learn the A and B matrix without strong priors, which is also the case for this environment. 
 
 If you use this code in your work or research, please consider citing our paper:
 ```

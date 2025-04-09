@@ -31,7 +31,6 @@ class Agent:
 
         self.policy_space = self.make_policy_space(num_actions=self.B.shape[2], plan_num_steps_ahead=plan_num_steps_ahead)
 
-
         self.epsilon = 0.0000001  # avoid division by zero, logs of zero
 
 

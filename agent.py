@@ -147,7 +147,7 @@ class Agent:
         self.A = self.pA / self.pA.sum(axis=0)
 
     def update_pA(self, observation):
-        """(19)"""
+        """(19) (Note that we update every time step instead of at the end of the episode) """
         observation = self.flattener.flatten_observation(observation)
         self.pA[observation, :] += self.belief_current_state
 
@@ -157,7 +157,7 @@ class Agent:
         self.B = self.pB / self.pB.sum(axis=0)
 
     def update_pB(self):
-        """(20)"""
+        """(20) (Note that we update every time step instead of at the end of the episode)"""
         self.pB[:, :, self.last_action] += np.outer(self.belief_current_state, self.belief_last_state)
 
 
